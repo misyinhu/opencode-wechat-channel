@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "wechat": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "bin/cli.js"
+      ],
+      "env": {},
+      "cwd": "/path/to/your-project"
+    }
+  }
+}
