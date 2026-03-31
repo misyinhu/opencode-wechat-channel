@@ -6,12 +6,13 @@
 
 ## 功能特性
 
-- ✅ 微信扫码登录
+- ✅ 微信扫码登录（支持自动恢复登录）
 - ✅ 微信消息自动转发到 OpenCode
-- ✅ OpenCode 回复自动发送到微信
+- ✅ OpenCode 回复自动发送到微信（带会话名标注）
 - ✅ 支持"正在输入"状态显示
-- ✅ /list 命令查看最近会话
+- ✅ /list 命令查看最近 5 个会话
 - ✅ /send 命令发送消息到指定会话
+- ✅ 默认消息发送到当前会话
 
 ## 安装
 
@@ -29,14 +30,14 @@ scripts/install.sh
 
 ## 快速开始
 
-1. 启动 OpenCode ACP 服务（端口 4097）
+1. 确保 OpenCode 已配置默认模型（`opencode.json` 中设置 `"model"` 字段）
 2. 运行插件：
 
 ```bash
 opencode-wechat-channel
 ```
 
-3. 扫描显示的二维码登录微信
+3. 扫描显示的二维码登录微信（首次登录）
 
 ## 使用方式
 
@@ -44,8 +45,10 @@ opencode-wechat-channel
 
 | 命令 | 说明 |
 |------|------|
-| `/list` | 显示最近 5 个活跃会话 |
-| `/send 序号 消息` | 发送消息到指定会话 |
+| `/list` | 显示最近 5 个活跃会话（序号 1-5） |
+| `/send 0 消息` | 创建新会话并发送消息 |
+| `/send N 消息` | 发送消息到第 N 个会话（N 对应 /list 中的序号） |
+| 直接发送消息 | 发送到当前会话（启动时创建的会话） |
 
 ### 示例
 
@@ -59,18 +62,37 @@ opencode-wechat-channel
 3 | frontend | UI 优化
 
 /send 2 你好，请查看这个接口
-→ 已发送给: 接口调试
+→ [接口调试]
+好的，我来帮你查看...
+
+hello
+→ [当前会话名]
+你好！有什么可以帮你的？
+
+/send 0 帮我写个 Python 脚本
+→ [新会话]
+好的，我来帮你写...
 ```
 
 ## 工作原理
 
 ```
-微信用户 → /send 序号 消息 → WeChat Channel → ACP → OpenCode 会话
-                                   ↓
-                              发送回复 → 微信用户
+微信用户 → 消息 → WeChat Channel → ACP (port 4097) → OpenCode 会话
+                                    ↓
+                               发送回复 → 微信用户
 ```
 
 ## 配置
+
+### OpenCode 默认模型
+
+在 `~/.config/opencode/opencode.json` 中设置默认模型：
+
+```json
+{
+  "model": "opencode/qwen3.6-plus-free"
+}
+```
 
 ### 凭据存储
 
@@ -95,6 +117,9 @@ npm run dev
 
 # 构建
 npm run build
+
+# 类型检查
+npm run typecheck
 
 # 测试
 npm run test
