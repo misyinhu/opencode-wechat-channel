@@ -612,8 +612,11 @@ export class WeChatChannel {
     if (trimmed === "/list") {
       try {
         const sessions = await this.agentProcess!.connection.listSessions({});
-        if (sessions.sessions && sessions.sessions.length > 0) {
-          this.cachedSessions = sessions.sessions.slice(0, 5).map(s => ({
+        const sessionList = sessions.sessions || [];
+        log(`/list 返回 ${sessionList.length} 个会话`);
+        
+        if (sessionList.length > 0) {
+          this.cachedSessions = sessionList.slice(0, 5).map(s => ({
             sessionId: String(s.sessionId),
             cwd: s.cwd || "",
             title: s.title || "-"
@@ -635,22 +638,51 @@ export class WeChatChannel {
     }
 
     if (trimmed.startsWith("/send ")) {
+      log(`/send 命令: ${trimmed}`);
       const match = trimmed.match(/^\/send\s+(\d+)\s+(.+)$/);
       if (match) {
         const idx = parseInt(match[1]) - 1;
         const text = match[2];
-        if (idx >= 0 && idx < this.cachedSessions.length) {
-          const targetSession = this.cachedSessions[idx];
-          await this.agentProcess!.connection.prompt({
-            sessionId: targetSession.sessionId,
-            prompt: [{ type: "text", text: `[微信消息] ${text}` }],
-          });
-          await this.wechatClient!.sendText(msg.chatId, `已发送给: ${targetSession.title}`);
-          return;
-        } else {
-          await this.wechatClient!.sendText(msg.chatId, "序号无效，请先 /list 查看");
+        
+        let sessionList;
+        try {
+          const sessions = await this.agentProcess.connection.listSessions({});
+          sessionList = sessions.sessions || [];
+          log(`/send listSessions 返回 ${sessionList.length} 个会话: ${JSON.stringify(sessionList.map(s => String(s.sessionId).slice(0, 15)))}`);
+        } catch (e) {
+          const errMsg = e instanceof Error ? e.message : JSON.stringify(e);
+          log(`listSessions 失败: ${errMsg}`);
+          await this.wechatClient!.sendText(msg.chatId, `获取会话列表失败`);
           return;
         }
+        
+        if (sessionList.length === 0) {
+          await this.wechatClient!.sendText(msg.chatId, `暂无会话，请先在 OpenCode 创建会话`);
+          return;
+        }
+        
+        if (idx < 0 || idx >= sessionList.length) {
+          await this.wechatClient!.sendText(msg.chatId, `序号无效，共 ${sessionList.length} 个会话`);
+          return;
+        }
+        
+        const targetSession = sessionList[idx];
+        const sessionId = String(targetSession.sessionId);
+        log(`发送到会话: ${sessionId.slice(0, 20)}...`);
+        
+        try {
+          await this.agentProcess.connection.prompt({
+            sessionId: sessionId,
+            prompt: [{ type: "text", text: `[微信消息] ${text}` }],
+          });
+          const title = targetSession.title || sessionId.slice(0, 12);
+          await this.wechatClient!.sendText(msg.chatId, `已发送到: ${title}`);
+        } catch (e) {
+          const errMsg = e instanceof Error ? e.message : JSON.stringify(e);
+          log(`prompt 失败: ${errMsg}`);
+          await this.wechatClient!.sendText(msg.chatId, `发送失败: ${errMsg}`);
+        }
+        return;
       } else {
         await this.wechatClient!.sendText(msg.chatId, "用法: /send 序号 消息\n例: /send 1 你好");
         return;
