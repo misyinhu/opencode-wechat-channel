@@ -419,6 +419,7 @@ export class WeChatChannel {
   private tokenData: TokenData | null = null;
   private isRunning = false;
   private cachedSessions: Array<{ sessionId: string; cwd: string; title: string }> = [];
+  private lastReplies: Map<string, string> = new Map();
 
   async initialize(): Promise<void> {
     const tempDir = path.join(os.tmpdir(), "weixin-opencode");
@@ -628,13 +629,23 @@ export class WeChatChannel {
             const project = s.cwd ? s.cwd.split("/").pop() || s.cwd : "-";
             return `${i + 1} | ${project} | ${s.title}`;
           }).join("\n");
-          table += "\n\n/send 0 = 新会话\n/send 1 = 第一个会话";
+          table += "\n\n/send 0 = 新会话\n/send 1 = 第一个会话\n/lastreply = 查看最后回复";
           await this.wechatClient!.sendText(msg.chatId, `最近会话:\n${table}`);
         } else {
           await this.wechatClient!.sendText(msg.chatId, "暂无活跃会话");
         }
       } catch (e) {
         await this.wechatClient!.sendText(msg.chatId, `获取会话列表失败: ${e}`);
+      }
+      return;
+    }
+
+    if (trimmed === "/lastreply") {
+      const reply = this.lastReplies.get(msg.chatId);
+      if (reply) {
+        await this.wechatClient!.sendText(msg.chatId, `[最后回复]\n${reply}`);
+      } else {
+        await this.wechatClient!.sendText(msg.chatId, "暂无最近回复记录");
       }
       return;
     }
@@ -670,6 +681,7 @@ export class WeChatChannel {
             }
 
             if (replyText.trim()) {
+              this.lastReplies.set(msg.chatId, replyText);
               await this.wechatClient!.sendText(msg.chatId, replyText);
               log(`回复: ${replyText.slice(0, 30)}...`);
             } else {
@@ -735,6 +747,7 @@ export class WeChatChannel {
           }
 
           if (replyText.trim()) {
+            this.lastReplies.set(msg.chatId, replyText);
             const title = targetSession.title || sessionId.slice(0, 12);
             await this.wechatClient!.sendText(msg.chatId, `[${title}]\n${replyText}`);
             log(`回复: ${replyText.slice(0, 30)}...`);
@@ -810,6 +823,7 @@ export class WeChatChannel {
       }
 
       if (replyText.trim()) {
+        this.lastReplies.set(msg.chatId, replyText);
         await this.wechatClient.sendText(msg.chatId, `[${targetTitle}]\n${replyText}`);
         log(`已回复: ${replyText.slice(0, 30)}...`);
       }
